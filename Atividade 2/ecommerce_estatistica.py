@@ -1,89 +1,96 @@
 import pandas as pd
-import matplotlib as plt
-import seaborn as sns
+import plotly.express as px
+from dash import Dash, html, dcc, Input, Output
 
-df = pd.read_csv("ecommerce.csv")
+# Carrega os dados
+df = pd.read_csv("ecommerce_estatistica.csv")
+lista_temp = df['Temporada'].unique()
+opcoes = [{'label': temporada, 'value': temporada} for temporada in lista_temp]
 
-### Linhas e Colunas
-print(df.shape, "\n")
-### Cabeça e Cauda
-print(df.head(), "\n")
-print(df.tail(), "\n")
-### Nome das Colunas
-columns_list = df.columns.tolist()
-print(columns_list, "\n")
-### Typos de Dados por Coluna
-print(df.dtypes, "\n")
-### Resumo de Estatísticas
-print(df.describe(), "\n")
-### Itens Únicos em cada coluna
-print(df[columns_list].nunique(), "\n")
-
-### Gráfico de Histograma
+# --- Funções dos gráficos ---
 def graf_hist(df):
-    plt.subplot(3,3,1)
-    plt.hist(df['Nota'])
-    plt.title('Nota Geral dos Produtos')
-    plt.xlabel('Nota')
-    plt.ylabel('Contagem')
+    fig = px.histogram(df, x='Nota')
+    fig.update_layout(title='Aceitação dos Produtos',
+                      xaxis_title='Nota',
+                      yaxis_title='Contagem')
+    return fig
 
-
-### Gráfico de dispersão
 def graf_disp(df):
-    plt.subplot(3,3,2)
-    plt.scatter(df['Preço'], df['Desconto'])
-    plt.ylabel('Desconto')
-    plt.xlabel('Preço do Produto')
-    plt.title('Desconto por Preço')
+    fig = px.scatter(df, x='Preço', y='Desconto')
+    fig.update_layout(title='Desconto por Preço',
+                      xaxis_title='Preço Produto',
+                      yaxis_title='Desconto')
+    return fig
 
-### Mapa de calor (Nota e N_avaliação)
 def graf_calor(df):
-    plt.subplot(3,3,3)
-    corr = df[['Nota', 'Material_Cod', 'Desconto']].corr()
-    sns.heatmap(corr, annot=True)
-    plt.title('Relação entre Campos:')
+    fig = px.density_heatmap(df, x='Desconto', y='N_Avaliações')
+    fig.update_layout(title='Relação entre Campos:')
+    return fig
 
-### Gráfico de barra
 def graf_barr(df):
-    plt.subplot(3,3,4)
-    df['Qtd_Vendidos'].value_counts().plot(kind='bar', title='Quantidade de Vendidos')
-    plt.title('Qtd de Vendas dos Produtos')
-    plt.xlabel('Qtd Vendas')
-    plt.ylabel('Contagem')
+    fig = px.bar(df, x='Gênero', y='Qtd_Vendidos_Cod')
+    fig.update_layout(title='Vendas por Gênero',
+                      xaxis_title='Gênero',
+                      yaxis_title='Total de Vendas')
+    return fig
 
-### Gráfico de pizza (Porcentagem de Nota dos Produtos em Geral)
 def graf_pizza(df):
-    plt.subplot(3,3,5)
-    df['Qtd_Vendidos'].value_counts().plot(kind='pie', title='Qtd Vendidos')
-    plt.title('Porcentagem de Vendas dos Produtos')
+    fig = px.pie(df, names='Título', values='Qtd_Vendidos')
+    fig.update_layout(title='Porcentagem de Vendas dos Produtos')
+    return fig
 
-### Gráfico de densidade (N_Avaliações)
 def graf_densidade(df):
-    plt.subplot(3,3,6)
-    sns.kdeplot(df['Nota'], fill=True, color='#863e9c')
-    plt.title('Avaliação de todos os produtos')
-    plt.xlabel('Nota')
-    plt.ylabel('Contagem')
-
-### Gráfico de Regressão
-def graf_regress(df):
-    plt.subplot(3,3,7)
-    sns.regplot(x='N_Avaliações', y='Desconto', data=df)
-    plt.title('Projeção de Avaliações por Desconto')
-    plt.xlabel('Avaliações')
-    plt.ylabel('Desconto')
+    fig = px.histogram(df, x='Título', y='Preço', histnorm='probability')
+    fig.update_layout(title='Projeção de Valor dos Produtos',
+                      xaxis_title='Produtos',
+                      yaxis_title='Preço')
+    return fig
 
 
-### Mostrando os Gráficos
-def junta_graf(df):
-    graf_hist(df)
-    graf_disp(df)
-    graf_calor(df)
-    graf_barr(df)
-    graf_pizz(df)
-    graf_densid(df)
-    graf_regress(df)
+# --- Criação do app ---
+app = Dash(__name__)
 
-junta_graf(df)
-plt.tight_layout()
-plt.show()
+app.layout = html.Div([
+    html.H1("Dashboard E-commerce"),
+    dcc.Checklist(
+        id='id_lista_temp',
+        options=opcoes,
+        value=[lista_temp[0]],
+        inline=True
+    ),
+    dcc.Graph(id='id_graf_hist'),
+    dcc.Graph(id='id_graf_disp'),
+    dcc.Graph(id='id_graf_calor'),
+    dcc.Graph(id='id_graf_barr'),
+    dcc.Graph(id='id_graf_pizza'),
+    dcc.Graph(id='id_graf_densidade'),
+])
+
+
+# --- Callback ---
+@app.callback(
+    [
+        Output('id_graf_hist', 'figure'),
+        Output('id_graf_disp', 'figure'),
+        Output('id_graf_calor', 'figure'),
+        Output('id_graf_barr', 'figure'),
+        Output('id_graf_pizza', 'figure'),
+        Output('id_graf_densidade', 'figure'),
+    ],
+    [Input('id_lista_temp', 'value')]
+)
+def update_figure(lista_temp):
+    df_filtrado = df[df['Temporada'].isin(lista_temp)]
+
+    fig1 = graf_hist(df_filtrado)
+    fig2 = graf_disp(df_filtrado)
+    fig3 = graf_calor(df_filtrado)
+    fig4 = graf_barr(df_filtrado)
+    fig5 = graf_pizza(df_filtrado)
+    fig6 = graf_densidade(df_filtrado)
+
+    return fig1, fig2, fig3, fig4, fig5, fig6
+
+
+if __name__ == '__main__':
+    app.run(debug=True, port=8050)
